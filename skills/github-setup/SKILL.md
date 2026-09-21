@@ -1,6 +1,6 @@
 ---
 name: github-setup
-description: Set up GitHub on a Mac from scratch so AI agents can create repos, push branches, open and review PRs with no password prompts. Installs git and the gh CLI, configures identity, logs in, sets up an SSH key, then verifies everything with a throwaway repo and PR. Use when the user asks to set up GitHub, install gh, connect GitHub for agents, or fix GitHub auth/push problems.
+description: Set up GitHub on a Mac from scratch, including creating a GitHub account if needed, so AI agents can create repos, push branches, open and review PRs with no password prompts. Installs git and the gh CLI, configures identity, logs in, sets up an SSH key, then verifies everything with a throwaway repo and PR. Use when the user asks to set up GitHub, install gh, connect GitHub for agents, or fix GitHub auth/push problems.
 ---
 
 # GitHub setup for AI agents (macOS)
@@ -13,6 +13,19 @@ Goal: the user ends with `git` + `gh` installed, logged in, pushing over **SSH**
 - **You can't do interactive/browser/password steps.** Give the user the exact command prefixed with `!` (so it runs in this session), say what they will see, and wait for them to say "done". Never ask for or handle passwords or tokens in chat.
 - **Outward-facing or destructive actions need confirmation**: creating the test repo, deleting it, deleting local files. Ask first, one action per command, no long `&&` chains that mix create and delete.
 - Use plain single-purpose commands. If a command is denied, don't retry verbatim; explain and offer the user a `!` command instead.
+
+## Step 0: GitHub account (beginners start here)
+
+Ask: "Do you already have a GitHub account?" If yes, skip to Step 1. If not or unsure, walk them through it one step at a time, waiting for "done" between steps:
+
+> 1. Open https://github.com/signup in your browser.
+> 2. Enter your email, create a password, and pick a **username**. It becomes part of your public URLs (github.com/username), so choose something you're happy to share.
+> 3. Solve the puzzle and enter the verification code GitHub emails you.
+> 4. Skip any optional questions and choose the **Free** plan.
+> 5. **Turn on two-factor authentication** (avatar > Settings > Password and authentication). GitHub requires it, and an authenticator app is the easiest way.
+> 6. Tell me your username and the email you signed up with.
+
+Use that same email in Step 3 (or their noreply address). Never ask for their password.
 
 ## Step 1: Inspect current state
 
