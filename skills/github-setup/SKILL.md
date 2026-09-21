@@ -1,33 +1,34 @@
 ---
 name: github-setup
-description: Set up GitHub on a Mac from scratch, including creating a GitHub account if needed, so AI agents can create repos, push branches, open and review PRs with no password prompts. Installs git and the gh CLI, configures identity, logs in, sets up an SSH key, then verifies everything with a throwaway repo and PR. Use when the user asks to set up GitHub, install gh, connect GitHub for agents, or fix GitHub auth/push problems.
+description: GitHub setup on a Mac, from zero (account, git, gh CLI, SSH) to a verified agent-ready workflow, and repair of broken GitHub auth or push failures. Triggers - set up GitHub, install gh, connect GitHub for agents, permission denied on push.
 ---
 
 # GitHub setup for AI agents (macOS)
 
-Goal: the user ends with `git` + `gh` installed, logged in, pushing over **SSH** (no repeated password logins), verified by a real end-to-end test.
+Done when `git` and `gh` are installed, logged in, pushing over **SSH** with no password prompts, and a real end-to-end test has passed.
 
 ## Ground rules
 
-- **Check before installing.** Every step starts with a check; skip it if already done. Tell the user what was already set up.
-- **You can't do interactive/browser/password steps.** Give the user the exact command prefixed with `!` (so it runs in this session), say what they will see, and wait for them to say "done". Never ask for or handle passwords or tokens in chat.
-- **Outward-facing or destructive actions need confirmation**: creating the test repo, deleting it, deleting local files. Ask first, one action per command, no long `&&` chains that mix create and delete.
-- Use plain single-purpose commands. If a command is denied, don't retry verbatim; explain and offer the user a `!` command instead.
+- **Check first.** Each step opens with a check; skip the step when it already passes, and tell the user what was already in place.
+- **Hand off browser, password and sudo steps.** Give the user the exact command prefixed with `!` (it runs in this session), say what they will see, and wait for "done". Passwords and tokens are typed by the user into the browser or terminal prompt, never into chat.
+- **Gate every outward-facing or destructive action.** Creating the test repo, deleting it, and deleting local files each need the user's yes first.
+- **One action per command.** Create and delete never share a command chain. When a command is denied, explain why and offer the user a `!` version.
+- Failures: see [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for command-not-found, publickey errors, HTTPS remotes, scope errors and denied commands.
 
-## Step 0: GitHub account (beginners start here)
+## Step 0: GitHub account
 
-Ask: "Do you already have a GitHub account?" If yes, skip to Step 1. If not or unsure, walk them through it one step at a time, waiting for "done" between steps:
+Ask: "Do you already have a GitHub account?" Yes → Step 1. No or unsure → walk through these one at a time, waiting for "done" between them:
 
-> 1. Open https://github.com/signup in your browser.
-> 2. Enter your email, create a password, and pick a **username**. It becomes part of your public URLs (github.com/username), so choose something you're happy to share.
-> 3. Solve the puzzle and enter the verification code GitHub emails you.
-> 4. Skip any optional questions and choose the **Free** plan.
-> 5. **Turn on two-factor authentication** (avatar > Settings > Password and authentication). GitHub requires it, and an authenticator app is the easiest way.
-> 6. Tell me your username and the email you signed up with.
+> 1. Open https://github.com/signup.
+> 2. Enter your email, create a password, and pick a **username** (it appears in your public URLs, so choose one you'll share).
+> 3. Solve the puzzle and enter the code GitHub emails you.
+> 4. Skip the optional questions and choose the **Free** plan.
+> 5. Turn on two-factor authentication (avatar > Settings > Password and authentication); an authenticator app is easiest.
+> 6. Tell me your username and signup email.
 
-Use that same email in Step 3 (or their noreply address). Never ask for their password.
+Done when the user has given a username and email.
 
-## Step 1: Inspect current state
+## Step 1: Inspect
 
 ```bash
 which brew git gh; git --version; gh --version
@@ -37,24 +38,23 @@ ls ~/.ssh
 ssh -T -o StrictHostKeyChecking=accept-new git@github.com 2>&1 | head -3
 ```
 
-Summarize what's present and what's missing, then continue with only the missing steps.
+Done when you have told the user which of these are present and which are missing. Every later step covers only what is missing.
 
 ## Step 2: Install tools
 
-**Homebrew missing** — needs the user's Mac password, so the user runs it:
+**Homebrew** (needs the Mac password, so the user runs it):
 
-> Paste this in the prompt (with the `!`), enter your Mac password when asked, and follow any "Next steps" it prints (usually two `eval` lines to add brew to your PATH):
+> Paste this with the `!`, enter your Mac password when asked, then run the "Next steps" lines it prints (usually two `eval` lines that put brew on your PATH):
 > `! /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`
 
-**git missing** — `brew install git` (or `xcode-select --install`, which opens a GUI installer the user must click through).
+**git**: `brew install git` (alternative: `xcode-select --install`, a GUI installer the user clicks through).
+**gh**: `brew install gh`
 
-**gh missing** — `brew install gh`
-
-Re-run `git --version` and `gh --version` to confirm.
+Done when `git --version` and `gh --version` both print versions.
 
 ## Step 3: Git identity
 
-If `user.name` / `user.email` are empty, ask the user for their name and their GitHub email (or the `ID+username@users.noreply.github.com` address from github.com/settings/emails if they want privacy), then:
+Ask for the user's name and GitHub email (or the `ID+username@users.noreply.github.com` address from github.com/settings/emails for privacy). Then:
 
 ```bash
 git config --global user.name "Their Name"
@@ -62,37 +62,29 @@ git config --global user.email "their@email"
 git config --global init.defaultBranch main
 ```
 
-## Step 4: Log in to GitHub (browser, user does this)
+Done when both `git config --global user.name` and `user.email` print values.
 
-Give the user this exact step:
+## Step 4: Log in (browser, user runs it)
 
-> 1. Paste: `! gh auth login --web --git-protocol ssh --scopes repo,workflow,read:org,gist,admin:public_key`
-> 2. If asked, choose **GitHub.com**. If it asks to generate/upload an SSH key, say **yes** and accept the defaults (an empty passphrase is fine, or use one and let the macOS Keychain remember it).
+> 1. Paste: `! gh auth login --web --git-protocol ssh --scopes repo,workflow,read:org,gist,admin:public_key,delete_repo`
+> 2. Choose **GitHub.com**. If it offers to generate and upload an SSH key, say **yes** and accept the defaults.
 > 3. It prints a one-time code like `ABCD-1234`. Press Enter, your browser opens, paste the code, sign in, click **Authorize**.
 > 4. Tell me "done".
 
-Scopes: `repo` (repos/PRs), `workflow` (Actions files), `read:org`, `gist`, `admin:public_key` (upload the SSH key). Add `delete_repo` only if the user wants agents to be able to delete repos; it lets the test clean up after itself, so recommend it for the test and offer to revoke later with `gh auth refresh` (without the scope).
+Scopes: `repo` (repos and PRs), `workflow` (Actions files), `read:org`, `gist`, `admin:public_key` (upload the SSH key), `delete_repo` (test cleanup; the broadest of the set, so the user may drop it and delete the test repo in the browser instead).
 
-Verify: `gh auth status`
+Done when `gh auth status` shows the user logged in.
 
-## Step 5: SSH key (no password prompts)
+## Step 5: SSH key
 
-Check whether GitHub already accepts the machine's key:
+Runs only when Step 1's `ssh -T` did not answer `Hi <user>! You've successfully authenticated`; re-run it first, since Step 4 may already have uploaded a key.
 
-```bash
-ssh -T -o StrictHostKeyChecking=accept-new git@github.com 2>&1 | head -3
-```
+If `ls ~/.ssh/id_ed25519.pub ~/.ssh/id_rsa.pub` finds no key, ask: "Passphrase on the key, or none?"
 
-- `Hi <user>! You've successfully authenticated` → done, skip to Step 6.
-- `Permission denied (publickey)` → a key is missing or not uploaded.
+- **None**: `ssh-keygen -t ed25519 -C "their@email" -f ~/.ssh/id_ed25519 -N ""`
+- **Passphrase**: the user runs `! ssh-keygen -t ed25519 -C "their@email" -f ~/.ssh/id_ed25519` and types the passphrase at the prompt.
 
-If no key exists (`ls ~/.ssh/id_ed25519.pub ~/.ssh/id_rsa.pub`), generate one. The user should pick a passphrase-free key only if they are comfortable with that; otherwise use the Keychain:
-
-```bash
-ssh-keygen -t ed25519 -C "their@email" -f ~/.ssh/id_ed25519 -N ""
-```
-
-Make macOS load the key automatically:
+Load it through the macOS Keychain (skip the `cat` when `~/.ssh/config` already has a `Host github.com` block):
 
 ```bash
 cat >> ~/.ssh/config <<'EOF'
@@ -104,58 +96,47 @@ EOF
 ssh-add --apple-use-keychain ~/.ssh/id_ed25519
 ```
 
-(Skip the config append if `~/.ssh/config` already has a `Host github.com` block.) Upload it:
+Upload and switch `gh` to SSH:
 
 ```bash
 gh ssh-key add ~/.ssh/id_ed25519.pub --title "$(scutil --get ComputerName)"
-```
-
-If this fails on scope: ask the user to run `! gh auth refresh -h github.com -s admin:public_key` (browser flow like Step 4).
-
-Then make `gh` and git use SSH and re-test:
-
-```bash
 gh config set git_protocol ssh -h github.com
-ssh -T git@github.com 2>&1 | head -3
 ```
 
-## Step 6: End-to-end test (confirm with the user first)
+Scope error on upload → the user runs `! gh auth refresh -h github.com -s admin:public_key`.
 
-Tell the user: "I'll create a private throwaway repo, push a branch, open a PR, review it, then delete the repo. OK?" Wait for yes. Use a temp dir (not the user's projects). Run these as **separate commands**:
+Done when `ssh -T git@github.com` answers `Hi <user>! You've successfully authenticated`.
 
-1. Create + push:
+## Step 6: End-to-end test
+
+Gate: "I'll create a private throwaway repo, push a branch, open a PR, and review it. OK?" Then run these as **separate commands** in `~/gh-setup-test`, not in the user's projects:
+
+1. Create and push:
    ```bash
    mkdir -p ~/gh-setup-test && cd ~/gh-setup-test && git init -b main && echo hi > README.md && git add . && git commit -m init && gh repo create gh-agent-test --private --source=. --push
    ```
-2. Branch + PR:
+2. Branch and PR:
    ```bash
    git checkout -b feature && echo more >> README.md && git commit -am "feature change" && git push -u origin feature && gh pr create --title "Test PR" --body "test" --base main --head feature
    ```
-3. Review (GitHub doesn't allow approving your own PR, so use a comment review):
+3. Review (GitHub blocks approving your own PR, so use a comment review):
    ```bash
    gh pr review 1 --comment --body "LGTM test review" && gh pr diff 1 && gh pr view 1 --json state,reviews --jq '{state,reviews:(.reviews|length)}'
    ```
-   Expect `state: OPEN`, `reviews: 1`.
 
-## Step 7: Clean up (confirm first)
+Done when step 3 prints `state: OPEN` and `reviews: 1`.
 
-Ask: "Test passed. Delete the throwaway repo and the local folder?" Then, separately:
+## Step 7: Clean up
+
+Gate: "Test passed. Delete the throwaway repo and the local folder?" Then, as two separate commands:
 
 ```bash
-gh repo delete <username>/gh-agent-test --yes     # needs delete_repo scope
+gh repo delete <username>/gh-agent-test --yes
 rm -rf ~/gh-setup-test
 ```
 
-If `gh repo delete` fails on scope: `! gh auth refresh -h github.com -s delete_repo`, or have the user delete it at `github.com/<username>/gh-agent-test/settings`. If `rm -rf` is denied, give the user `! rm -rf ~/gh-setup-test`.
+Done when `gh repo view <username>/gh-agent-test` reports not found and `~/gh-setup-test` is gone.
 
 ## Step 8: Report
 
-Give a short summary: what was already there, what you installed, auth method (SSH), scopes granted, test result, cleanup status. List what agents can now do: `gh repo create`, `gh pr create/review/diff/merge`, `gh issue`, `gh run`, plain `git push`.
-
-## Troubleshooting
-
-- `gh: command not found` after brew install → open a new terminal, or `eval "$(/opt/homebrew/bin/brew shellenv)"`.
-- `Permission denied (publickey)` → key not uploaded (`gh ssh-key list`) or not loaded (`ssh-add -l`; re-run `ssh-add --apple-use-keychain <key>`).
-- Existing remotes still on HTTPS → `git remote set-url origin git@github.com:<user>/<repo>.git`.
-- Wrong `gh` (name collision with another "gh" package) → `which gh` should be `/opt/homebrew/bin/gh`.
-- Need agents to use a limited token instead (CI/servers): create a fine-grained token at github.com/settings/personal-access-tokens and export it as `GH_TOKEN`.
+Summarize in a few lines: what was already in place, what you installed, auth method (SSH), scopes granted, test result, cleanup status. Close with what agents can now do: create repos, push, open, review and merge PRs, manage issues and Actions runs.
